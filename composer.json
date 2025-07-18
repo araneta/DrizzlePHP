@@ -1,0 +1,38 @@
+{
+    "name": "drizzle-php/drizzle-php",
+    "description": "A type-safe query builder for PHP inspired by Drizzle ORM",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "aldo praherda",
+            "email": "aldopraherda@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.1",
+        "ext-pdo": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0",
+        "phpstan/phpstan": "^1.10",
+        "squizlabs/php_codesniffer": "^3.7"
+    },
+    "autoload": {
+        "psr-4": {
+            "DrizzlePHP\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "DrizzlePHP\\Tests\\": "tests/",
+            "App\\": "examples/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "analyse": "phpstan analyse src",
+        "cs-check": "phpcs src",
+        "cs-fix": "phpcbf src"
+    }
+}
