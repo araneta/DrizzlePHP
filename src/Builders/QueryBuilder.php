@@ -134,7 +134,7 @@ class QueryBuilder
         $columns = $this->schemaClass::getColumns();
         
         if (!isset($columns[$column])) {
-            throw new InvalidArgumentException("Column '{$column}' does not exist in schema");
+            throw new InvalidColumnException("Column '{$column}' does not exist in schema");
         }
     }
 
