@@ -66,4 +66,18 @@ abstract class Schema
         
         return null;
     }
+
+    public function first(bool $asObject = false): object|array|null
+    {
+        $this->limit(1);
+        $results = $this->get();
+        $row = $results[0] ?? null;
+
+        if ($asObject) {
+            // Assumes your schema class has fromArray() as discussed earlier
+            return $this->schemaClass::fromArray($row);
+        }
+
+        return $row;
+    }
 }
