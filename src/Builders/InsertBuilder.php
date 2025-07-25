@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace DrizzlePHP\Builders;
+use InvalidArgumentException;
 
 use DrizzlePHP\Exceptions\InvalidColumnException;
 use DrizzlePHP\Schema\Schema;

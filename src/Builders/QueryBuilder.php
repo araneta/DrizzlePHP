@@ -21,6 +21,8 @@ class QueryBuilder
     private ?int $limitCount = null;
     private ?int $offsetCount = null;
     private string $schemaClass;
+    private ?string $lastSql = null;
+
 
     /** @var array<string, string> [table => schemaClass] */
     private array $joinSchemas = [];
@@ -35,9 +37,7 @@ class QueryBuilder
 
     public function select(array $columns = ['*']): self
     {
-        foreach ($columns as $column) {
-            $this->validateColumn($column);
-        }
+        
         $this->columns = $columns;
         return $this;
     }
@@ -75,24 +75,21 @@ class QueryBuilder
 
     public function join(string $joinTable, string $joinSchemaClass, string $leftColumn, string $operator, string $rightColumn, string $type = 'INNER'): self
     {
-        // Register the join table and validate it
-        $this->joinSchemas[$joinTable] = $joinSchemaClass;
-
-        $this->validateColumn($leftColumn);
-        $this->validateColumn($rightColumn);
+        $alias = $this->extractTableAlias($joinTable);
+        $this->joinSchemas[$alias] = $joinSchemaClass;
 
         $this->joins[] = strtoupper($type) . " JOIN {$joinTable} ON {$leftColumn} {$operator} {$rightColumn}";
         return $this;
     }
 
-    public function leftJoin(string $joinTable, string $joinSchemaClass, string $leftColumn, string $operator, string $rightColumn): self
+    public function leftJoin(string $joinTable, string $schemaClass, string $leftColumn, string $operator, string $rightColumn): self
     {
-        return $this->join($joinTable, $joinSchemaClass, $leftColumn, $operator, $rightColumn, 'LEFT');
+        return $this->join($joinTable, $schemaClass, $leftColumn, $operator, $rightColumn, 'LEFT');
     }
 
-    public function rightJoin(string $joinTable, string $joinSchemaClass, string $leftColumn, string $operator, string $rightColumn): self
+    public function rightJoin(string $joinTable, string $schemaClass, string $leftColumn, string $operator, string $rightColumn): self
     {
-        return $this->join($joinTable, $joinSchemaClass, $leftColumn, $operator, $rightColumn, 'RIGHT');
+        return $this->join($joinTable, $schemaClass, $leftColumn, $operator, $rightColumn, 'RIGHT');
     }
 
     public function limit(int $count): self
@@ -110,6 +107,7 @@ class QueryBuilder
     public function get(): array
     {
         $sql = $this->buildSelectQuery();
+        $this->lastSql = $sql;
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($this->bindings);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -133,6 +131,7 @@ class QueryBuilder
         if (!empty($this->wheres)) {
             $sql .= ' WHERE ' . implode(' AND ', $this->wheres);
         }
+        $this->lastSql = $sql;
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($this->bindings);
@@ -141,7 +140,16 @@ class QueryBuilder
 
     private function buildSelectQuery(): string
     {
-        $columns = empty($this->columns) ? '*' : implode(', ', $this->columns);
+        $columns = '*';
+		if (!empty($this->columns)) {
+			$validated = [];
+			foreach ($this->columns as $column) {
+				$this->validateColumn($column);
+				$validated[] = $column;
+			}
+			$columns = implode(', ', $validated);
+		}
+
         $sql = "SELECT {$columns} FROM {$this->table}";
 
         if (!empty($this->joins)) {
@@ -168,45 +176,64 @@ class QueryBuilder
     }
 
     private function validateColumn(string $column): void
-	{
-		// If column contains SQL expressions (like alias, function, etc.) — skip validation
-		if (
-			str_contains($column, ' AS ') ||
-			str_contains($column, '(') ||
-			str_contains($column, ')')
-		) {
-			return;
-		}
+    {
+        // Remove alias if present
+        if (stripos($column, ' AS ') !== false) {
+            [$column] = preg_split('/\s+AS\s+/i', $column);
+        }
 
-		// Fully-qualified e.g., paket.nama
-		if (str_contains($column, '.')) {
-			[$table, $col] = explode('.', $column, 2);
+        // Handle functions or raw SQL — skip validation
+        if (str_contains($column, '(') || str_contains($column, ')')) {
+            return;
+        }
 
-			if ($table === $this->schemaClass::getTableName()) {
-				$columns = $this->schemaClass::getColumns();
-				if (!isset($columns[$col])) {
-					throw new InvalidColumnException("Column '{$column}' does not exist in schema");
-				}
-				return;
-			}
+        // Handle wildcard e.g. pembayaran.* or alias.*
+        if (preg_match('/^([a-zA-Z0-9_]+)\.\*$/', $column, $matches)) {
+            $table = $matches[1];
+            if (!isset($this->joinSchemas[$table])) {
+                throw new InvalidColumnException("Wildcard '{$column}': table alias '{$table}' is not registered.");
+            }
+            return;
+        }
 
-			// Optional: allow columns from joined tables by skipping or mapping manually
-			return;
-		}
+        // Qualified column
+        if (str_contains($column, '.')) {
+            [$table, $col] = explode('.', $column, 2);
+            $schemaClass = $this->joinSchemas[$table] ?? null;
 
-		// No join, allow non-prefixed
-		if (empty($this->joins)) {
-			$columns = $this->schemaClass::getColumns();
-			if (!isset($columns[$column])) {
-				throw new InvalidColumnException("Column '{$column}' does not exist in schema");
-			}
-			return;
-		}
+            if (!$schemaClass) {
+                throw new InvalidColumnException("Table alias '{$table}' is not registered.");
+            }
 
-		throw new InvalidColumnException("Column '{$column}' must be prefixed with a table name");
-	}
+            $columns = $schemaClass::getColumns();
+            if (!isset($columns[$col])) {
+                throw new InvalidColumnException("Column '{$col}' does not exist in schema for table '{$table}'.");
+            }
+            return;
+        }
+
+        // Unqualified column (only valid if no joins)
+        if (empty($this->joins)) {
+            $columns = $this->schemaClass::getColumns();
+            if (!isset($columns[$column])) {
+                throw new InvalidColumnException("Column '{$column}' does not exist in schema.");
+            }
+            return;
+        }
+
+        throw new InvalidColumnException("Column '{$column}' must be prefixed with a table name.");
+    }
 
 
+    private function getTableAlias(string $schemaClass): ?string
+    {
+        foreach ($this->joinSchemas as $alias => $class) {
+            if ($class === $schemaClass) {
+                return $alias;
+            }
+        }
+        return null;
+    }
 
     private function generatePlaceholder(string $column): string
     {
@@ -219,5 +246,30 @@ class QueryBuilder
         }
 
         return $placeholder;
+    }
+
+    private function extractTableAlias(string $table): string
+    {
+        if (preg_match('/\s+AS\s+(\w+)$/i', $table, $matches)) {
+            return $matches[1];
+        }
+
+        // Support syntax like: "table alias"
+        if (preg_match('/(\w+)\s+(\w+)$/', $table, $matches)) {
+            return $matches[2];
+        }
+
+        return $table;
+    }
+
+    public function getLastSql(): ?string
+    {
+            return $this->lastSql;
+    }
+
+    public function whereRaw(string $condition): self
+    {
+        $this->wheres[] = $condition;
+        return $this;
     }
 }
