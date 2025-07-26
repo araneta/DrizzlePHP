@@ -40,7 +40,7 @@ class UsersTable extends Table
 $pdo = new \PDO('mysql:host=localhost;dbname=drizzle', 'root', 'willamette');
 $db = new Database($pdo);
 $users = new UsersTable();
-
+$db->beginTransaction();
 // Example 1: Simple select
 echo "=== Example 1: Simple Select ===\n";
 $results = $db->select()
@@ -105,5 +105,5 @@ $rowsAffected = $db->update()
 	->where(eq($users->email, 'john@example.com'))
 	->execute();
 echo "Rows affected: $rowsAffected\n";
-
+$db->commit();
 echo "\n=== All examples completed! ===\n";
