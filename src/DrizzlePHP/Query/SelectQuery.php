@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace DrizzlePHP\Query;
 
 use DrizzlePHP\Condition\Condition;
-use DrizzlePHP\Schema\Column;
+use DrizzlePHP\Column\Column;
 use DrizzlePHP\Schema\Table;
 use InvalidArgumentException;
 use PDO;
