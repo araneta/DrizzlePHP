@@ -51,12 +51,8 @@ $results = $db->select()
 
 ## Documentation
 
-- [Installation Guide](docs/installation.md)
-- [Quick Start](docs/quick-start.md)
-- [Schema Definition](docs/schema-definition.md)
-- [Querying Data](docs/querying.md)
-- [Working with Views](docs/views.md)
-- [Performance Guide](docs/performance.md)
+- [Schema Generator Guide](https://github.com/araneta/DrizzlePHP/wiki/Schema-Generator)
+
 
 ## Performance
 
