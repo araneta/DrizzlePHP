@@ -14,7 +14,7 @@ A high-performance, type-safe PHP ORM inspired by Drizzle ORM.
 ## Installation
 
 ```bash
-composer require drizzle-php/orm
+composer require drizzle-php/drizzle-php
 ```
 
 ## Quick Start
